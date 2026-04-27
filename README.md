@@ -77,7 +77,19 @@ Backend (Node.js API)
 ↓
 MongoDB Database
 ```
+Deployment Architecture (REAL DEVOPS)
+```
+## ☁️ Deployment Architecture
 
+Production deployment flow:
+
+User → Nginx → Backend API → MongoDB
+
+- Hosted on AWS EC2
+- Dockerized services
+- Reverse proxy using Nginx
+- Secure environment variables
+```
 ---
 
 ## ⚙️ Tech Stack
@@ -105,3 +117,35 @@ MongoDB Database
 ```bash
 docker compose up --build
 ```
+🔑 Seed Admin
+```
+docker exec -it backend node seedAdmin.js
+```
+📸 Screenshots
+🔐 Login
+<img width="1920" height="970" alt="image" src="https://github.com/user-attachments/assets/bf5429ba-979e-4b21-b02c-5c51c29e1927" />
+
+📊 Dashboard
+<img width="1920" height="1257" alt="image" src="https://github.com/user-attachments/assets/b6e06f77-a126-454b-80aa-3d9d0a13a871" />
+
+🧑 Donor
+<img width="1732" height="1536" alt="image" src="https://github.com/user-attachments/assets/34222c31-49fd-4a1f-b618-a10f0677d03a" />
+
+📦 Requests
+<img width="1920" height="1121" alt="image" src="https://github.com/user-attachments/assets/934eacc0-31a1-4085-8595-81d42795b46c" />
+
+🩸 Inventory
+<img width="1920" height="1518" alt="image" src="https://github.com/user-attachments/assets/6cbaf200-d702-4828-9c21-d85ad4a8ab9b" />
+
+📁 Project Structure
+```
+backend/
+frontend/
+nginx/
+docker-compose.yml
+```
+
+
+
+
+
