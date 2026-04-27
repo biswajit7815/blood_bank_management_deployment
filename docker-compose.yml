@@ -16,11 +16,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-<<<<<<< HEAD
-    networks: 
-=======
     networks:
->>>>>>> 28c95d02b0009f4a9c699488978e9b49033807d2
       - bbms_network
 
   backend:
@@ -28,11 +24,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     env_file:
-<<<<<<< HEAD
-      -  ./.env 
-=======
       -  ./.env
->>>>>>> 28c95d02b0009f4a9c699488978e9b49033807d2
     expose:
       - "5000"
     depends_on:
@@ -45,11 +37,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-<<<<<<< HEAD
-      args:
-        VITE_API_PATH: ${VITE_API_PATH}
-=======
->>>>>>> 28c95d02b0009f4a9c699488978e9b49033807d2
     volumes:
        - ./frontend/dist:/app/dist
     command: ["npm","run","build"]

@@ -18,10 +18,9 @@ RUN npm install
 COPY . .
 
 #  Set environment to production in this stage no dev dependencies are included
-<<<<<<< HEAD
+
 ARG VITE_API_PATH
-=======
->>>>>>> 28c95d02b0009f4a9c699488978e9b49033807d2
+
 ENV NODE_ENV=production
 
 #  Inject Backend API URL (Build-time variable)

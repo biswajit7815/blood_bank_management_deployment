@@ -28,15 +28,12 @@ WORKDIR /app
 # Set environment to production
 ENV NODE_ENV=production
 
-<<<<<<< HEAD
 # this line add kyu kar raha he because i am used node:21-alpine base image 
 # by default alpine me wget nehi hota he isliye job me build karta hu backend unhealthy show kar raha he 
 # so that i used this line ..automatic download the wget command 
-=======
 # this line add kyu kar raha he because i am used node:21-alpine base image
 # by default alpine me wget nehi hota he isliye job me build karta hu backend unhealthy show kar raha he
 # so that i used this line ..automatic download the wget command
->>>>>>> 28c95d02b0009f4a9c699488978e9b49033807d2
 # RUN apk add --no-cache wget
 
 # Create non-root user for security
