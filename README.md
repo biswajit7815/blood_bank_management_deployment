@@ -1,8 +1,10 @@
 # 🚀 Blood Bank Management System (BBMS)
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=28&duration=3000&pause=1000&color=F70000&center=true&vCenter=true&width=800&lines=Production+Ready+Blood+Bank+System;Full+Stack+%2B+DevOps+Project;Dockerized+Microservices+Architecture;Built+with+React+%2C+Node+%2C+MongoDB" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=30&duration=2500&pause=1000&color=FF0000&center=true&vCenter=true&width=900&lines=Production+Ready+Blood+Bank+System;Full+Stack+%2B+DevOps+Project;Dockerized+Microservices+Architecture;Built+with+React+Node+MongoDB;Deployed+with+Nginx+%26+Docker" />
 </p>
+
+---
 
 <p align="center">
   <img src="https://img.shields.io/badge/Frontend-React-blue?style=for-the-badge&logo=react"/>
@@ -10,21 +12,43 @@
   <img src="https://img.shields.io/badge/Database-MongoDB-darkgreen?style=for-the-badge&logo=mongodb"/>
   <img src="https://img.shields.io/badge/DevOps-Docker-blue?style=for-the-badge&logo=docker"/>
   <img src="https://img.shields.io/badge/Proxy-Nginx-green?style=for-the-badge&logo=nginx"/>
+  <img src="https://img.shields.io/badge/Status-Production--Ready-success?style=for-the-badge"/>
+</p>
+
+---
+
+## 📊 GitHub Stats
+
+<p align="center">
+  <img src="https://github-readme-stats.vercel.app/api?username=biswajit7815&show_icons=true&theme=radical" height="180"/>
+  <img src="https://github-readme-streak-stats.herokuapp.com/?user=biswajit7815&theme=radical" height="180"/>
+</p>
+
+---
+
+## 📈 Contribution Graph
+
+<p align="center">
+  <img src="https://github-readme-activity-graph.vercel.app/graph?username=biswajit7815&theme=react-dark"/>
 </p>
 
 ---
 
 ## 📌 Overview
 
-A **production-ready Blood Bank Management System** that digitizes blood donation, hospital requests, and inventory tracking.
+A **production-ready Blood Bank Management System** that digitizes:
 
-💡 Built with **Full Stack + DevOps mindset** to simulate real-world scalable applications.
+- 🩸 Blood inventory management  
+- 🏥 Hospital requests  
+- 👤 Donor management  
+
+💡 Built using **Full Stack + DevOps approach** to simulate real-world scalable systems.
 
 ---
 
 ## 🧠 Problem
 
-- ❌ No real-time blood availability  
+- ❌ No real-time inventory  
 - ❌ Emergency delays  
 - ❌ Manual errors  
 - ❌ No centralized system  
@@ -33,17 +57,26 @@ A **production-ready Blood Bank Management System** that digitizes blood donatio
 
 ## 💡 Solution
 
-- ✅ Real-time inventory tracking  
-- ✅ Secure authentication (JWT)  
-- ✅ Dockerized microservices  
-- ✅ Scalable backend APIs  
+- ✅ Real-time tracking  
+- ✅ JWT secure authentication  
+- ✅ Dockerized architecture  
+- ✅ Scalable REST APIs  
 - ✅ Nginx reverse proxy  
 
 ---
 
 ## 🏗️ Architecture
-
-
+```
+User (Browser)
+↓
+Nginx (Reverse Proxy)
+↓
+Frontend (React Build)
+↓
+Backend (Node.js API)
+↓
+MongoDB Database
+```
 
 ---
 
@@ -72,52 +105,3 @@ A **production-ready Blood Bank Management System** that digitizes blood donatio
 ```bash
 docker compose up --build
 ```
-
-🔑 Seed Admin
-```
-docker exec -it backend node seedAdmin.js
-
-```
-📸 Screenshots
-🔐 Login
-<img width="1920" height="970" alt="image" src="https://github.com/user-attachments/assets/bf56e662-1733-45d3-afbb-2b5084008cbd" />
-
-📊 Dashboard
-
-<img width="1920" height="1257" alt="image" src="https://github.com/user-attachments/assets/c1cccbbf-dc90-470b-9991-ae0d8efecc68" />
-
-
-🧑 Donor
-
-📦 Requests
-
-<img width="1920" height="1121" alt="image" src="https://github.com/user-attachments/assets/ede1a90b-9b1e-44ff-8c79-48714c3951b9" />
-
-
-
-🩸 Inventory
-
-<img width="1920" height="1518" alt="image" src="https://github.com/user-attachments/assets/35943f12-5157-4a99-9a3e-7b289d5291da" />
-
-
-🚀 DevOps Highlights
-🐳 Multi-container architecture
-🔁 Service dependency & health checks
-🌐 Reverse proxy with Nginx
-📦 Persistent storage (volumes)
-🔐 Environment-based config
-
-
-
-📁 Structure
-```
-backend/
-frontend/
-nginx/
-docker-compose.yml
-```
-
-
-
-
-
