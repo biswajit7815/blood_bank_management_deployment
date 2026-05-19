@@ -81,7 +81,7 @@ pipeline {
                         --build-arg VITE_API_PATH=http://${EC2_PUBLIC_IP}:${BACKEND_PORT} \
                         -t ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${IMAGE_TAG} \
                         -t ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest \
-                        -f frontend/Dockerfile
+                        -f frontend/Dockerfile \
                         ./frontend
                 """
             }
