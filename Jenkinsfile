@@ -5,35 +5,37 @@ pipeline {
         nodejs 'node21'
     }
 
-    // all environment variable i used this so entire pipeline me when need these i only used ok..
-
     environment {
         DOCKERHUB_USERNAME = "biswajit7815"
         BACKEND_IMAGE = "blood-backend"
         FRONTEND_IMAGE = "blood-frontend"
         IMAGE_TAG = "${BUILD_NUMBER}"
+
         SCANNER_HOME = tool 'sonar-scanner'
+
         BACKEND_CONTAINER = 'blood-backend'
         FRONTEND_CONTAINER = 'blood-frontend'
+
         BACKEND_PORT = '5000'
         EC2_PUBLIC_IP = "65.2.189.152"
     }
 
     stages {
 
-        // stage 1: clean and checkout
-
+        // =========================
+        // CLEANUP & CHECKOUT
+        // =========================
         stage('cleanup & checkout') {
             steps {
                 cleanWs()
                 checkout scm
-                echo "code checkout complete - Build #${BUiLD_NUMBER}"
+                echo "Code checkout complete - Build #${BUILD_NUMBER}"
             }
         }
 
-        // stage: 2 install all dependncies with parallel
-        // why i used this because fast install even time consume nehi lega
-
+        // =========================
+        // INSTALL DEPENDENCIES
+        // =========================
         stage('install dependencies') {
             parallel {
 
@@ -45,7 +47,7 @@ pipeline {
                     }
                 }
 
-                stage('frontend install') {
+                stage('Frontend install') {
                     steps {
                         dir('frontend') {
                             sh 'npm install'
@@ -55,14 +57,86 @@ pipeline {
             }
         }
 
-        // build the docker images
+        // =========================
+        // SECURITY SCAN
+        // =========================
+        stage('security scan') {
+            parallel {
 
-        stage('Build Docker images') {
+                // OWASP Dependency Check
+                stage('OWASP Dependency Check') {
+                    steps {
+
+                        sh 'mkdir -p reports/owasp'
+
+                        dependencyCheck(
+                            additionalArguments: '''
+                                --scan backend/
+                                --scan frontend/
+                                --format HTML
+                                --format XML
+                                --out reports/owasp/
+                                --disableAssembly
+                                --disableYarnAudit
+                                --disableNodeAudit
+                                --prettyPrint
+                            ''',
+                            odcInstallation: 'DP-Check'
+                        )
+
+                        dependencyCheckPublisher(
+                            pattern: 'reports/owasp/dependency-check-report.xml',
+                            failedTotalCritical: 10,
+                            unstableTotalCritical: 5
+                        )
+                    }
+                }
+
+                // Trivy FS Scan
+                stage('Trivy FS Scan') {
+                    steps {
+
+                        sh '''
+                            mkdir -p reports/trivy
+
+                            trivy fs . \
+                                --exit-code 0 \
+                                --severity HIGH,CRITICAL \
+                                --format table \
+                                -o reports/trivy/fs-scan.txt
+
+                            cat reports/trivy/fs-scan.txt
+                        '''
+                    }
+                }
+            }
+        }
+
+        // =========================
+        // SONARQUBE
+        // =========================
+        stage('SonarQube Analysis') {
             steps {
 
-                // build the backend image....
+                withSonarQubeEnv('sonar-server') {
 
-                echo "build the backend image...."
+                    sh """
+                        ${SCANNER_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectKey=blood-bank-management \
+                        -Dsonar.projectName=blood-bank-management \
+                        -Dsonar.sources=backend,frontend
+                    """
+                }
+            }
+        }
+
+        // =========================
+        // BUILD DOCKER IMAGES
+        // =========================
+        stage('Build Docker Images') {
+            steps {
+
+                echo "Building backend image..."
 
                 sh """
                     docker build \
@@ -72,9 +146,7 @@ pipeline {
                         ./backend
                 """
 
-                // build the fronted image.....
-
-                echo "build frontend image..."
+                echo "Building frontend image..."
 
                 sh """
                     docker build \
@@ -87,11 +159,37 @@ pipeline {
             }
         }
 
-        stage('push to docker hub') {
+        // =========================
+        // TRIVY IMAGE SCAN
+        // =========================
+        stage('Trivy Image Scan') {
             steps {
-                script {
 
-                    // Jenkins ke stored secret credentials use karta hai.
+                sh """
+                    trivy image \
+                        --exit-code 0 \
+                        --severity HIGH,CRITICAL \
+                        --format table \
+                        -o reports/trivy/backend-image-scan.txt \
+                        ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest
+
+                    trivy image \
+                        --exit-code 0 \
+                        --severity HIGH,CRITICAL \
+                        --format table \
+                        -o reports/trivy/frontend-image-scan.txt \
+                        ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest
+                """
+            }
+        }
+
+        // =========================
+        // PUSH TO DOCKER HUB
+        // =========================
+        stage('Push to Docker Hub') {
+            steps {
+
+                script {
 
                     withCredentials([
                         usernamePassword(
@@ -101,7 +199,7 @@ pipeline {
                         )
                     ]) {
 
-                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
 
                         sh "docker push ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${IMAGE_TAG}"
                         sh "docker push ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest"
@@ -115,29 +213,32 @@ pipeline {
             }
         }
 
-        // deploy the application
-
-        stage('deploy') {
+        // =========================
+        // DEPLOY
+        // =========================
+        stage('Deploy') {
             steps {
+
                 script {
 
                     withCredentials([
                         string(credentialsId: 'MONGO_URI', variable: 'MONGO_URI'),
-                        string(credentialsId: 'JWT_SECRET', variable: 'JWT_SECRET'),
+                        string(credentialsId: 'JWT_SECRET', variable: 'JWT_SECRET')
                     ]) {
 
-                        echo "stopping old container........"
+                        echo "Stopping old containers..."
 
                         sh "docker stop ${BACKEND_CONTAINER} || true"
                         sh "docker stop ${FRONTEND_CONTAINER} || true"
+
                         sh "docker rm ${BACKEND_CONTAINER} || true"
                         sh "docker rm ${FRONTEND_CONTAINER} || true"
 
-                        echo "creating docker network...."
+                        echo "Creating Docker network..."
 
                         sh "docker network create blood-network || true"
 
-                        echo "starting Backend container....."
+                        echo "Starting backend container..."
 
                         sh """
                             docker run -d \
@@ -150,7 +251,7 @@ pipeline {
                                 ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${IMAGE_TAG}
                         """
 
-                        echo "staring frontend container......."
+                        echo "Starting frontend container..."
 
                         sh """
                             docker run -d \
@@ -161,39 +262,40 @@ pipeline {
                                 ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${IMAGE_TAG}
                         """
 
-                        echo "Waiting for containers to start..."
+                        echo "Waiting for containers..."
 
-                        sh "sleep 15"
+                        sh "sleep 20"
 
-                        echo "Container Status"
+                        echo "Container status..."
 
                         sh "docker ps --filter 'name=${BACKEND_CONTAINER}'"
                         sh "docker ps --filter 'name=${FRONTEND_CONTAINER}'"
 
-                        echo "Backend Health Check"
+                        echo "Backend health check..."
 
-                        sh "curl -sf http://localhost:${BACKEND_PORT}/api/health && echo 'Backend Healthy' || echo 'Backend Health Failed'"
+                        sh "curl -sf http://localhost:${BACKEND_PORT}/health && echo 'Backend Healthy'"
 
-                        echo "Frontend Health Check"
+                        echo "Frontend health check..."
 
-                        sh "curl -sf http://localhost && echo 'Frontend Healthy' || echo 'Frontend Health Failed'"
+                        sh "curl -sf http://localhost && echo 'Frontend Healthy'"
 
-                        echo "Application Live : http://${EC2_PUBLIC_IP}"
+                        echo "Application Live: http://${EC2_PUBLIC_IP}"
                     }
                 }
             }
         }
 
-        // cleanup the old image
-
-        stage('cleanup old images') {
+        // =========================
+        // CLEANUP OLD IMAGES
+        // =========================
+        stage('Cleanup Old Images') {
             steps {
 
                 echo "Cleaning dangling images..."
 
                 sh "docker image prune -f"
 
-                echo "Removing the old backend image......"
+                echo "Removing old backend images..."
 
                 sh """
                     docker images ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE} --format "{{.Tag}}" \
@@ -217,6 +319,9 @@ pipeline {
     post {
 
         always {
+
+            archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
+
             sh "docker logout || true"
         }
 
@@ -229,6 +334,7 @@ pipeline {
         }
 
         cleanup {
+
             cleanWs(
                 cleanWhenSuccess: true,
                 cleanWhenFailure: false,
