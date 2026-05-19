@@ -130,8 +130,8 @@ pipeline {
 
                         sh "docker stop ${BACKEND_CONTAINER} || true"
                         sh "docker stop ${FRONTEND_CONTAINER} || true"
-                        sh "docker rm ${BACKEND_CONTAINER} || ture"
-                        sh "docker rm ${FRONTEND_CONTAINER} || ture"
+                        sh "docker rm ${BACKEND_CONTAINER} || true"
+                        sh "docker rm ${FRONTEND_CONTAINER} || true"
 
                         echo "creating docker network...."
 
