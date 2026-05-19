@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    tool {
+        nodejs 'node18'
+    }
+
     // all environment variable i used this so entire pipeline me when need these i only used ok..
 
     environment {
