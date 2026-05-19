@@ -23,7 +23,7 @@ pipeline {
             steps {
                 cleanWs()
                 checkout scm
-                echo "code checkout complete - Build #${BULD_NUMBER}"
+                echo "code checkout complete - Build #${BUiLD_NUMBER}"
             }
         }
 
@@ -75,8 +75,8 @@ pipeline {
                 sh """
                     docker build \
                         --build-arg VITE_API_PATH=http://${EC2_PUBLIC_IP}:${BACKEND_PORT} \
-                        -t ${DOCKERHUB_USERNAME}/{FRONTEND_IMAGE}:${IMAGE_TAG} \
-                        -T ${DOCKERHUB_USERNAME}/{FRONTEND_IMAGE}:;atest \
+                        -t ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${IMAGE_TAG} \
+                        -t ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest \
                         -f frontend/Dockerfile
                         ./frontend
                 """
@@ -93,7 +93,7 @@ pipeline {
                         usernamePassword(
                             credentialsId: 'docker-hub-creds',
                             passwordVariable: 'DOCKER_PASS',
-                            usernameVarible: 'DOCKER_USER'
+                            usernameVariable: 'DOCKER_USER'
                         )
                     ]) {
 
@@ -124,7 +124,7 @@ pipeline {
 
                         echo "stopping old container........"
 
-                        sh "docker stop ${BACKEND_CONTAINER} || ture"
+                        sh "docker stop ${BACKEND_CONTAINER} || true"
                         sh "docker stop ${FRONTEND_CONTAINER} || true"
                         sh "docker rm ${BACKEND_CONTAINER} || ture"
                         sh "docker rm ${FRONTEND_CONTAINER} || ture"
@@ -140,9 +140,9 @@ pipeline {
                                 --name ${BACKEND_CONTAINER} \
                                 --network blood-network \
                                 --restart unless-stopped \
-                                -p $BACKEND_PORT}:$BACKEND_PORT} \
-                                -e MONGO_URI="${MONGO_URI}"
-                                -e JWT_SECRET="${JWT_SECRET}"
+                                -p ${BACKEND_PORT}:${BACKEND_PORT} \
+                                -e MONGO_URI="${MONGO_URI}" \
+                                -e JWT_SECRET="${JWT_SECRET}" \
                                 ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${IMAGE_TAG}
                         """
 
@@ -150,7 +150,7 @@ pipeline {
 
                         sh """
                             docker run -d \
-                                -name ${FRONTEND_CONTAINER} \
+                                --name ${FRONTEND_CONTAINER} \
                                 --network blood-network \
                                 --restart unless-stopped \
                                 -p 80:80 \
