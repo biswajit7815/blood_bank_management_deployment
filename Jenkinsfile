@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        nodejs 'node18'
+        nodejs 'node21'
     }
 
     // all environment variable i used this so entire pipeline me when need these i only used ok..
