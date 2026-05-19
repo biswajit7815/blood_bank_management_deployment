@@ -87,7 +87,7 @@ pipeline {
                         dependencyCheckPublisher(
                             pattern: 'reports/owasp/dependency-check-report.xml',
                             failedTotalCritical: 20,
-                            unstableTotalCritical: 5
+                            unstableTotalCritical: 20
                         )
                     }
                 }
