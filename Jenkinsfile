@@ -318,28 +318,154 @@ pipeline {
 
     post {
 
-        always {
-
-            archiveArtifacts artifacts: 'reports/**/*', allowEmptyArchive: true
-
-            sh "docker logout || true"
-        }
-
-        success {
-            echo "Build #${BUILD_NUMBER} deployed successfully - http://${EC2_PUBLIC_IP}"
-        }
-
-        failure {
-            echo "Build #${BUILD_NUMBER} failed - ${BUILD_URL}console"
-        }
-
-        cleanup {
-
-            cleanWs(
-                cleanWhenSuccess: true,
-                cleanWhenFailure: false,
-                cleanWhenAborted: true
-            )
-        }
+    // HAMESHA CHALEGA - pass ho ya fail
+    always {
+        archiveArtifacts artifacts: 'reports/**/', allowEmptyArchive: true
+        sh "docker logout || true"
     }
+
+    // SIRF SUCCESS PAR
+    success {
+        emailext(
+            to:       'aapka@gmail.com',
+            subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - SUCCESS",
+            mimeType: 'text/html',
+            attachmentPattern: 'reports/trivy/*.txt',
+            body:     """
+                <html>
+                <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
+
+                    <div style="background-color: white; padding: 30px; border-radius: 8px; border-left: 5px solid green;">
+
+                        <h2 style="color: green;">Build Successfully Deploy Ho Gaya!</h2>
+
+                        <table border="1" cellpadding="10" cellspacing="0" width="100%">
+                            <tr style="background-color: #f9f9f9;">
+                                <td><b>Project</b></td>
+                                <td>${JOB_NAME}</td>
+                            </tr>
+                            <tr>
+                                <td><b>Build Number</b></td>
+                                <td>#${BUILD_NUMBER}</td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td><b>Status</b></td>
+                                <td style="color: green;"><b>SUCCESS</b></td>
+                            </tr>
+                            <tr>
+                                <td><b>Duration</b></td>
+                                <td>${currentBuild.durationString}</td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td><b>Application URL</b></td>
+                                <td>
+                                    <a href="http://${EC2_PUBLIC_IP}">
+                                        http://${EC2_PUBLIC_IP}
+                                    </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><b>Build URL</b></td>
+                                <td>
+                                    <a href="${BUILD_URL}">
+                                        ${BUILD_URL}
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br>
+                        <p style="color: #555;">
+                            <b>Trivy Security Reports attached hain:</b><br>
+                            &nbsp;&nbsp;• fs-scan.txt — File System Scan<br>
+                            &nbsp;&nbsp;• backend-image-scan.txt — Backend Image Scan<br>
+                            &nbsp;&nbsp;• frontend-image-scan.txt — Frontend Image Scan<br>
+                        </p>
+                        <p style="color: gray;">
+                            Yeh email automatically Jenkins ne bheji hai.
+                        </p>
+
+                    </div>
+                </body>
+                </html>
+            """
+        )
+    }
+
+    // SIRF FAILURE PAR
+    failure {
+        emailext(
+            to:       'aapka@gmail.com',
+            subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - FAILED",
+            mimeType: 'text/html',
+            attachmentPattern: 'reports/trivy/*.txt',
+            body:     """
+                <html>
+                <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
+
+                    <div style="background-color: white; padding: 30px; border-radius: 8px; border-left: 5px solid red;">
+
+                        <h2 style="color: red;">Build Fail Ho Gaya!</h2>
+
+                        <table border="1" cellpadding="10" cellspacing="0" width="100%">
+                            <tr style="background-color: #f9f9f9;">
+                                <td><b>Project</b></td>
+                                <td>${JOB_NAME}</td>
+                            </tr>
+                            <tr>
+                                <td><b>Build Number</b></td>
+                                <td>#${BUILD_NUMBER}</td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td><b>Status</b></td>
+                                <td style="color: red;"><b>FAILED</b></td>
+                            </tr>
+                            <tr>
+                                <td><b>Duration</b></td>
+                                <td>${currentBuild.durationString}</td>
+                            </tr>
+                            <tr style="background-color: #f9f9f9;">
+                                <td><b>Failed Stage</b></td>
+                                <td>${currentBuild.result}</td>
+                            </tr>
+                            <tr>
+                                <td><b>Console Logs</b></td>
+                                <td>
+                                    <a href="${BUILD_URL}console">
+                                        Yahan Click Karo — Logs Dekho
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <br>
+                        <p style="color: #555;">
+                            <b>Trivy Security Reports attached hain:</b><br>
+                            &nbsp;&nbsp;• fs-scan.txt — File System Scan<br>
+                            &nbsp;&nbsp;• backend-image-scan.txt — Backend Image Scan<br>
+                            &nbsp;&nbsp;• frontend-image-scan.txt — Frontend Image Scan<br>
+                        </p>
+                        <p style="color: red;">
+                            Console logs dekho aur error fix karo!
+                        </p>
+                        <p style="color: gray;">
+                            Yeh email automatically Jenkins ne bheji hai.
+                        </p>
+
+                    </div>
+                </body>
+                </html>
+            """
+        )
+    }
+
+    // CLEANUP
+    cleanup {
+        cleanWs(
+            cleanWhenSuccess: true,
+            cleanWhenFailure: false,
+            cleanWhenAborted: true
+        )
+    }
+}
 }
