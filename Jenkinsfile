@@ -459,7 +459,7 @@ pipeline {
         )
     }
 
-    // CLEANUP
+    // cleanup
     cleanup {
         cleanWs(
             cleanWhenSuccess: true,
