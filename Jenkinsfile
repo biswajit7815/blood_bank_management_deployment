@@ -327,7 +327,7 @@ pipeline {
     // SIRF SUCCESS PAR
     success {
         emailext(
-            to:       'aapka@gmail.com',
+            to:       'biswajitbehera1868@gmail.com',
             subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - SUCCESS",
             mimeType: 'text/html',
             attachmentPattern: 'reports/trivy/*.txt',
@@ -395,7 +395,7 @@ pipeline {
     // SIRF FAILURE PAR
     failure {
         emailext(
-            to:       'aapka@gmail.com',
+            to:       'biswajitbehera1868@gmail.com',
             subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - FAILED",
             mimeType: 'text/html',
             attachmentPattern: 'reports/trivy/*.txt',
