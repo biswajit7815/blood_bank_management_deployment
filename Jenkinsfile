@@ -330,7 +330,7 @@ pipeline {
             to:       'biswajitbehera1868@gmail.com',
             subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - SUCCESS",
             mimeType: 'text/html',
-            attachmentPattern: 'reports/trivy/*.txt',
+            attachmentsPattern: 'reports/trivy/*.txt',
             body:     """
                 <html>
                 <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
@@ -398,7 +398,7 @@ pipeline {
             to:       'biswajitbehera1868@gmail.com',
             subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - FAILED",
             mimeType: 'text/html',
-            attachmentPattern: 'reports/trivy/*.txt',
+            attachmentsPattern: 'reports/trivy/*.txt',
             body:     """
                 <html>
                 <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
