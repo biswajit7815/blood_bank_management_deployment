@@ -388,21 +388,21 @@ pipeline {
                 """
             )
 
-            slackSend(
-                channel: '#jenkins-notifications',
-                color:   'good',
-                message: """
-[${DEPLOY_ENV}] BUILD SUCCESS
+//             slackSend(
+//                 channel: '#jenkins-notifications',
+//                 color:   'good',
+//                 message: """
+// [${DEPLOY_ENV}] BUILD SUCCESS
 
-Branch      : ${env.BRANCH_NAME}
-Worker Node : ${env.NODE_NAME}
-Project     : ${JOB_NAME}
-Build       : #${BUILD_NUMBER}
-Duration    : ${currentBuild.durationString}
-App URL     : http://${EC2_PUBLIC_IP}
-Build URL   : ${BUILD_URL}
-                """
-            )
+// Branch      : ${env.BRANCH_NAME}
+// Worker Node : ${env.NODE_NAME}
+// Project     : ${JOB_NAME}
+// Build       : #${BUILD_NUMBER}
+// Duration    : ${currentBuild.durationString}
+// App URL     : http://${EC2_PUBLIC_IP}
+// Build URL   : ${BUILD_URL}
+//                 """
+//             )
         }
 
         // FAILURE NOTIFICATION
@@ -427,20 +427,20 @@ Build URL   : ${BUILD_URL}
                 """
             )
 
-            slackSend(
-                channel: '#jenkins-notifications',
-                color:   'danger',
-                message: """
-[${DEPLOY_ENV}] BUILD FAILED
+//             slackSend(
+//                 channel: '#jenkins-notifications',
+//                 color:   'danger',
+//                 message: """
+// [${DEPLOY_ENV}] BUILD FAILED
 
-Branch      : ${env.BRANCH_NAME}
-Worker Node : ${env.NODE_NAME}
-Project     : ${JOB_NAME}
-Build       : #${BUILD_NUMBER}
-Duration    : ${currentBuild.durationString}
-Console     : ${BUILD_URL}console
-                """
-            )
+// Branch      : ${env.BRANCH_NAME}
+// Worker Node : ${env.NODE_NAME}
+// Project     : ${JOB_NAME}
+// Build       : #${BUILD_NUMBER}
+// Duration    : ${currentBuild.durationString}
+// Console     : ${BUILD_URL}console
+//                 """
+//             )
         }
 
         // cleanup
