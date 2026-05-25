@@ -443,7 +443,7 @@ Console     : ${BUILD_URL}console
             )
         }
 
-        // CLEANUP
+        // cleanup
         cleanup {
             cleanWs(
                 cleanWhenSuccess:  true,
