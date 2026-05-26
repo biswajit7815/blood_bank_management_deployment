@@ -1,5 +1,9 @@
 pipeline {
-    agent any
+
+    // MASTER-SLAVE Worker Selection
+    agent {
+        label "${env.BRANCH_NAME == 'main' ? 'worker-prod' : 'worker-staging'}"
+    }
 
     tools {
         nodejs 'node21'
@@ -7,35 +11,45 @@ pipeline {
 
     environment {
         DOCKERHUB_USERNAME = "biswajit7815"
-        BACKEND_IMAGE = "blood-backend"
-        FRONTEND_IMAGE = "blood-frontend"
-        IMAGE_TAG = "${BUILD_NUMBER}"
+        BACKEND_IMAGE      = "blood-backend"
+        FRONTEND_IMAGE     = "blood-frontend"
+        IMAGE_TAG          = "${BUILD_NUMBER}"
 
         SCANNER_HOME = tool 'sonar-scanner'
 
-        BACKEND_CONTAINER = 'blood-backend'
-        FRONTEND_CONTAINER = 'blood-frontend'
+        // Branch ke hisaab se alag container names
+        // main    --> blood-backend-main,    blood-frontend-main
+        // staging --> blood-backend-staging, blood-frontend-staging
+        BACKEND_CONTAINER  = "blood-backend-${env.BRANCH_NAME}"
+        FRONTEND_CONTAINER = "blood-frontend-${env.BRANCH_NAME}"
 
         BACKEND_PORT = '5000'
-        EC2_PUBLIC_IP = "65.2.189.152"
+
+        // EC2 Public IP
+        EC2_PUBLIC_IP = "${env.BRANCH_NAME == 'main' ? '3.110.220.24' : '13.233.90.203'}"
+
+        // SonarQube Project
+        SONAR_PROJECT_KEY = "${env.BRANCH_NAME == 'main' ? 'blood-bank-prod' : 'blood-bank-staging'}"
+
+        // Deploy Environment
+        DEPLOY_ENV = "${env.BRANCH_NAME == 'main' ? 'PRODUCTION' : 'STAGING'}"
     }
 
     stages {
 
-        // =========================
         // CLEANUP & CHECKOUT
-        // =========================
         stage('cleanup & checkout') {
             steps {
                 cleanWs()
                 checkout scm
                 echo "Code checkout complete - Build #${BUILD_NUMBER}"
+                echo "Branch   : ${env.BRANCH_NAME}"
+                echo "Worker   : ${env.NODE_NAME}"
+                echo "Environ  : ${DEPLOY_ENV}"
             }
         }
 
-        // =========================
         // INSTALL DEPENDENCIES
-        // =========================
         stage('install dependencies') {
             parallel {
 
@@ -57,13 +71,11 @@ pipeline {
             }
         }
 
-        // =========================
         // SECURITY SCAN
-        // =========================
         stage('security scan') {
             parallel {
 
-                // OWASP Dependency Check........
+                // OWASP Dependency Check
                 stage('OWASP Dependency Check') {
                     steps {
 
@@ -92,7 +104,7 @@ pipeline {
                     }
                 }
 
-                // Trivy FS Scan karta he.....
+                // Trivy FS Scan
                 stage('Trivy FS Scan') {
                     steps {
 
@@ -112,56 +124,53 @@ pipeline {
             }
         }
 
-        // =========================
         // SONARQUBE
-        // =========================
         stage('SonarQube Analysis') {
             steps {
 
                 withSonarQubeEnv('sonar-server') {
 
+                    // SonarQube Scan
                     sh """
                         ${SCANNER_HOME}/bin/sonar-scanner \
-                        -Dsonar.projectKey=blood-bank-management \
-                        -Dsonar.projectName=blood-bank-management \
+                        -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                        -Dsonar.projectName=${SONAR_PROJECT_KEY} \
                         -Dsonar.sources=backend,frontend
                     """
                 }
             }
         }
 
-        // =========================
         // BUILD DOCKER IMAGES
-        // =========================
         stage('Build Docker Images') {
             steps {
 
                 echo "Building backend image..."
 
+                // Docker Backend Build
                 sh """
                     docker build \
                         -t ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${IMAGE_TAG} \
-                        -t ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest \
+                        -t ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${env.BRANCH_NAME}-latest \
                         -f backend/Dockerfile \
                         ./backend
                 """
 
                 echo "Building frontend image..."
 
+                // Docker Frontend Build
                 sh """
                     docker build \
                         --build-arg VITE_API_PATH=http://${EC2_PUBLIC_IP}:${BACKEND_PORT} \
                         -t ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${IMAGE_TAG} \
-                        -t ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest \
+                        -t ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${env.BRANCH_NAME}-latest \
                         -f frontend/Dockerfile \
                         ./frontend
                 """
             }
         }
 
-        // =========================
         // TRIVY IMAGE SCAN
-        // =========================
         stage('Trivy Image Scan') {
             steps {
 
@@ -171,21 +180,19 @@ pipeline {
                         --severity HIGH,CRITICAL \
                         --format table \
                         -o reports/trivy/backend-image-scan.txt \
-                        ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest
+                        ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${IMAGE_TAG}
 
                     trivy image \
                         --exit-code 0 \
                         --severity HIGH,CRITICAL \
                         --format table \
                         -o reports/trivy/frontend-image-scan.txt \
-                        ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest
+                        ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${IMAGE_TAG}
                 """
             }
         }
 
-        // =========================
         // PUSH TO DOCKER HUB
-        // =========================
         stage('Push to Docker Hub') {
             steps {
 
@@ -201,11 +208,12 @@ pipeline {
 
                         sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
 
+                        // Push Docker Images
                         sh "docker push ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${IMAGE_TAG}"
-                        sh "docker push ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:latest"
-
                         sh "docker push ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${IMAGE_TAG}"
-                        sh "docker push ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:latest"
+
+                        sh "docker push ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${env.BRANCH_NAME}-latest"
+                        sh "docker push ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${env.BRANCH_NAME}-latest"
 
                         sh "docker logout"
                     }
@@ -213,41 +221,48 @@ pipeline {
             }
         }
 
-        // =========================
         // DEPLOY
-        // =========================
         stage('Deploy') {
             steps {
 
                 script {
 
+                    // MongoDB Credential Selection
+                    def mongoCredId = (env.BRANCH_NAME == 'main')
+                        ? 'MONGO_URI_PROD'
+                        : 'MONGO_URI_STAGING'
+
                     withCredentials([
-                        string(credentialsId: 'MONGO_URI', variable: 'MONGO_URI'),
+                        string(credentialsId: mongoCredId,  variable: 'MONGO_URI'),
                         string(credentialsId: 'JWT_SECRET', variable: 'JWT_SECRET')
                     ]) {
 
+                        echo "Deploying to ${DEPLOY_ENV}..."
+
                         echo "Stopping old containers..."
 
-                        sh "docker stop ${BACKEND_CONTAINER} || true"
+                        sh "docker stop ${BACKEND_CONTAINER}  || true"
                         sh "docker stop ${FRONTEND_CONTAINER} || true"
 
-                        sh "docker rm ${BACKEND_CONTAINER} || true"
+                        sh "docker rm ${BACKEND_CONTAINER}  || true"
                         sh "docker rm ${FRONTEND_CONTAINER} || true"
 
                         echo "Creating Docker network..."
 
-                        sh "docker network create blood-network || true"
+                        // Docker Network
+                        sh "docker network create blood-network-${env.BRANCH_NAME} || true"
 
                         echo "Starting backend container..."
 
                         sh """
                             docker run -d \
                                 --name ${BACKEND_CONTAINER} \
-                                --network blood-network \
+                                --network blood-network-${env.BRANCH_NAME} \
                                 --restart unless-stopped \
                                 -p ${BACKEND_PORT}:${BACKEND_PORT} \
                                 -e MONGO_URI="${MONGO_URI}" \
                                 -e JWT_SECRET="${JWT_SECRET}" \
+                                -e NODE_ENV="${env.BRANCH_NAME == 'main' ? 'production' : 'staging'}" \
                                 ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:${IMAGE_TAG}
                         """
 
@@ -256,7 +271,7 @@ pipeline {
                         sh """
                             docker run -d \
                                 --name ${FRONTEND_CONTAINER} \
-                                --network blood-network \
+                                --network blood-network-${env.BRANCH_NAME} \
                                 --restart unless-stopped \
                                 -p 80:80 \
                                 ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:${IMAGE_TAG}
@@ -285,9 +300,7 @@ pipeline {
             }
         }
 
-        // =========================
         // CLEANUP OLD IMAGES
-        // =========================
         stage('Cleanup Old Images') {
             steps {
 
@@ -297,18 +310,20 @@ pipeline {
 
                 echo "Removing old backend images..."
 
+                // Cleanup Backend Images
                 sh """
                     docker images ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE} --format "{{.Tag}}" \
-                        | grep -v "latest" \
+                        | grep -v "${env.BRANCH_NAME}-latest" \
                         | grep -v "${IMAGE_TAG}" \
                         | xargs -r -I {} docker rmi ${DOCKERHUB_USERNAME}/${BACKEND_IMAGE}:{} || true
                 """
 
                 echo "Removing old frontend images..."
 
+                // Cleanup Frontend Images
                 sh """
                     docker images ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE} --format "{{.Tag}}" \
-                        | grep -v "latest" \
+                        | grep -v "${env.BRANCH_NAME}-latest" \
                         | grep -v "${IMAGE_TAG}" \
                         | xargs -r -I {} docker rmi ${DOCKERHUB_USERNAME}/${FRONTEND_IMAGE}:{} || true
                 """
@@ -318,154 +333,123 @@ pipeline {
 
     post {
 
-    // HAMESHA CHALEGA - pass ho ya fail
-    always {
-        archiveArtifacts artifacts: 'reports/**/', allowEmptyArchive: true
-        sh "docker logout || true"
+        // ALWAYS RUN
+        always {
+            archiveArtifacts artifacts: 'reports/**/', allowEmptyArchive: true
+            sh "docker logout || true"
+        }
+
+        // SUCCESS NOTIFICATION
+        success {
+
+            emailext(
+                to:                 'biswajitbehera1868@gmail.com',
+                subject:            "[${DEPLOY_ENV}] Build #${BUILD_NUMBER} - ${JOB_NAME} - SUCCESS",
+                mimeType:           'text/html',
+                attachmentsPattern: 'reports/trivy/*.txt',
+                body:               """
+                    <html>
+                    <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
+
+                        <div style="background-color: white; padding: 30px; border-radius: 8px; border-left: 5px solid green;">
+
+                            <h2 style="color: green;">Build Successfully Deploy Ho Gaya!</h2>
+
+                            <table border="1" cellpadding="10" cellspacing="0" width="100%">
+                                <tr style="background-color: #f9f9f9;">
+                                    <td><b>Environment</b></td>
+                                    <td>${DEPLOY_ENV}</td>
+                                </tr>
+                                <tr>
+                                    <td><b>Branch</b></td>
+                                    <td>${env.BRANCH_NAME}</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td><b>Worker Node</b></td>
+                                    <td>${env.NODE_NAME}</td>
+                                </tr>
+                                <tr>
+                                    <td><b>Project</b></td>
+                                    <td>${JOB_NAME}</td>
+                                </tr>
+                                <tr style="background-color: #f9f9f9;">
+                                    <td><b>Build Number</b></td>
+                                    <td>#${BUILD_NUMBER}</td>
+                                </tr>
+                                <tr>
+                                    <td><b>Status</b></td>
+                                    <td style="color: green;"><b>SUCCESS</b></td>
+                                </tr>
+                            </table>
+
+                        </div>
+                    </body>
+                    </html>
+                """
+            )
+
+//             slackSend(
+//                 channel: '#jenkins-notifications',
+//                 color:   'good',
+//                 message: """
+// [${DEPLOY_ENV}] BUILD SUCCESS
+
+// Branch      : ${env.BRANCH_NAME}
+// Worker Node : ${env.NODE_NAME}
+// Project     : ${JOB_NAME}
+// Build       : #${BUILD_NUMBER}
+// Duration    : ${currentBuild.durationString}
+// App URL     : http://${EC2_PUBLIC_IP}
+// Build URL   : ${BUILD_URL}
+//                 """
+//             )
+        }
+
+        // FAILURE NOTIFICATION
+        failure {
+
+            emailext(
+                to:                 'biswajitbehera1868@gmail.com',
+                subject:            "[${DEPLOY_ENV}] Build #${BUILD_NUMBER} - ${JOB_NAME} - FAILED",
+                mimeType:           'text/html',
+                attachmentsPattern: 'reports/trivy/*.txt',
+                body:               """
+                    <html>
+                    <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
+
+                        <div style="background-color: white; padding: 30px; border-radius: 8px; border-left: 5px solid red;">
+
+                            <h2 style="color: red;">Build Fail Ho Gaya!</h2>
+
+                        </div>
+                    </body>
+                    </html>
+                """
+            )
+
+//             slackSend(
+//                 channel: '#jenkins-notifications',
+//                 color:   'danger',
+//                 message: """
+// [${DEPLOY_ENV}] BUILD FAILED
+
+// Branch      : ${env.BRANCH_NAME}
+// Worker Node : ${env.NODE_NAME}
+// Project     : ${JOB_NAME}
+// Build       : #${BUILD_NUMBER}
+// Duration    : ${currentBuild.durationString}
+// Console     : ${BUILD_URL}console
+//                 """
+//             )
+        }
+
+        // cleanup
+        cleanup {
+            cleanWs(
+                cleanWhenSuccess:  true,
+                cleanWhenFailure:  false,
+                cleanWhenAborted:  true
+            )
+        }
     }
-
-    // SIRF SUCCESS PAR
-    success {
-        emailext(
-            to:       'biswajitbehera1868@gmail.com',
-            subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - SUCCESS",
-            mimeType: 'text/html',
-            attachmentsPattern: 'reports/trivy/*.txt',
-            body:     """
-                <html>
-                <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
-
-                    <div style="background-color: white; padding: 30px; border-radius: 8px; border-left: 5px solid green;">
-
-                        <h2 style="color: green;">Build Successfully Deploy Ho Gaya!</h2>
-
-                        <table border="1" cellpadding="10" cellspacing="0" width="100%">
-                            <tr style="background-color: #f9f9f9;">
-                                <td><b>Project</b></td>
-                                <td>${JOB_NAME}</td>
-                            </tr>
-                            <tr>
-                                <td><b>Build Number</b></td>
-                                <td>#${BUILD_NUMBER}</td>
-                            </tr>
-                            <tr style="background-color: #f9f9f9;">
-                                <td><b>Status</b></td>
-                                <td style="color: green;"><b>SUCCESS</b></td>
-                            </tr>
-                            <tr>
-                                <td><b>Duration</b></td>
-                                <td>${currentBuild.durationString}</td>
-                            </tr>
-                            <tr style="background-color: #f9f9f9;">
-                                <td><b>Application URL</b></td>
-                                <td>
-                                    <a href="http://${EC2_PUBLIC_IP}">
-                                        http://${EC2_PUBLIC_IP}
-                                    </a>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><b>Build URL</b></td>
-                                <td>
-                                    <a href="${BUILD_URL}">
-                                        ${BUILD_URL}
-                                    </a>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br>
-                        <p style="color: #555;">
-                            <b>Trivy Security Reports attached hain:</b><br>
-                            &nbsp;&nbsp;• fs-scan.txt — File System Scan<br>
-                            &nbsp;&nbsp;• backend-image-scan.txt — Backend Image Scan<br>
-                            &nbsp;&nbsp;• frontend-image-scan.txt — Frontend Image Scan<br>
-                        </p>
-                        <p style="color: gray;">
-                            Yeh email automatically Jenkins ne bheji hai.
-                        </p>
-
-                    </div>
-                </body>
-                </html>
-            """
-        )
-    }
-
-    // SIRF FAILURE PAR
-    failure {
-        emailext(
-            to:       'biswajitbehera1868@gmail.com',
-            subject:  "Build #${BUILD_NUMBER} - ${JOB_NAME} - FAILED",
-            mimeType: 'text/html',
-            attachmentsPattern: 'reports/trivy/*.txt',
-            body:     """
-                <html>
-                <body style="font-family: Arial; padding: 20px; background-color: #f4f4f4;">
-
-                    <div style="background-color: white; padding: 30px; border-radius: 8px; border-left: 5px solid red;">
-
-                        <h2 style="color: red;">Build Fail Ho Gaya!</h2>
-
-                        <table border="1" cellpadding="10" cellspacing="0" width="100%">
-                            <tr style="background-color: #f9f9f9;">
-                                <td><b>Project</b></td>
-                                <td>${JOB_NAME}</td>
-                            </tr>
-                            <tr>
-                                <td><b>Build Number</b></td>
-                                <td>#${BUILD_NUMBER}</td>
-                            </tr>
-                            <tr style="background-color: #f9f9f9;">
-                                <td><b>Status</b></td>
-                                <td style="color: red;"><b>FAILED</b></td>
-                            </tr>
-                            <tr>
-                                <td><b>Duration</b></td>
-                                <td>${currentBuild.durationString}</td>
-                            </tr>
-                            <tr style="background-color: #f9f9f9;">
-                                <td><b>Failed Stage</b></td>
-                                <td>${currentBuild.result}</td>
-                            </tr>
-                            <tr>
-                                <td><b>Console Logs</b></td>
-                                <td>
-                                    <a href="${BUILD_URL}console">
-                                        Yahan Click Karo — Logs Dekho
-                                    </a>
-                                </td>
-                            </tr>
-                        </table>
-
-                        <br>
-                        <p style="color: #555;">
-                            <b>Trivy Security Reports attached hain:</b><br>
-                            &nbsp;&nbsp;• fs-scan.txt — File System Scan<br>
-                            &nbsp;&nbsp;• backend-image-scan.txt — Backend Image Scan<br>
-                            &nbsp;&nbsp;• frontend-image-scan.txt — Frontend Image Scan<br>
-                        </p>
-                        <p style="color: red;">
-                            Console logs dekho aur error fix karo!
-                        </p>
-                        <p style="color: gray;">
-                            Yeh email automatically Jenkins ne bheji hai.
-                        </p>
-
-                    </div>
-                </body>
-                </html>
-            """
-        )
-    }
-
-    // cleanup
-    cleanup {
-        cleanWs(
-            cleanWhenSuccess: true,
-            cleanWhenFailure: false,
-            cleanWhenAborted: true
-        )
-    }
-}
 }
